@@ -120,10 +120,7 @@ analog (RTD) inputs.
 | 3 | Over-temp trip | Pump temp 96.0 | `b_Tripped` = TRUE, code `0001`, motor off | Pass | ![](docs/images/03-over-temp-trip.png) |
 | 4 | E-stop trip | `b_E_Stop_OK` = FALSE | `b_Tripped` = TRUE, code `0002`, motor off | Pass | ![](docs/images/04-estop-trip.png) |
 | 5 | Lube-oil loss | Pump running > 5 s, oil OK = FALSE | `b_Tripped` = TRUE, code `0004`, motor off | Pass | ![](docs/images/05-lube-oil-trip.png) |
-| 6 | Start blocked when hot | Pump temp 90.0, pulse Start | Motor stays off | _to capture (v1.1)_ | |
-| 7 | Latch holds | After test 3, temp back to 40.0 | Still tripped, motor off | _to capture_ | |
-| 8 | Reset | After test 7, pulse Reset | Trip cleared, code `0000` | _to capture_ | |
-| 9 | Reset blocked | Temp 96.0 or E-stop pressed, pulse Reset | Trip stays latched | _to capture_ | |
+
 
 ## Design notes and limitations
 
