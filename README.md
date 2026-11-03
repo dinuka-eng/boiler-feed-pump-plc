@@ -146,7 +146,7 @@ analog (RTD) inputs.
 
 ## Author
 
-[Your Name] - Electrical and Electronic Engineer
-[LinkedIn / email]
+[Dinuka Senevirathne] - Electrical and Electronic Engineer
+
 
 Licensed under the MIT License.
