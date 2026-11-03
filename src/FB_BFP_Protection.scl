@@ -1,0 +1,76 @@
+// ============================================================================
+// FB_BFP_Protection  -  Boiler Feed Pump protection logic
+// Platform : Siemens S7-1200 (CPU 1214C DC/DC/DC), TIA Portal V16, SCL
+// Version  : 1.1
+//
+// Interface (see README for the full tag table)
+//   Input : b_Start_Cmd, b_Stop_Cmd, b_Reset_Trip, b_Oil_Pressure_OK,
+//           b_E_Stop_OK (fail-safe: FALSE = tripped),
+//           r_Pump_Bearing_Temp, r_Motor_Bearing_Temp,
+//           r_Temp_Alarm_SP (85.0), r_Temp_Trip_SP (95.0)
+//   Output: b_Motor_Run_Out, b_High_Temp_Alarm, b_Tripped, w_Trip_Code
+//   Static: b_Pump_Running, b_Trip_Latched, t_Oil_Lube_Timer (TON_TIME)
+//
+// Trip codes: 16#0000 healthy | 16#0001 over-temperature
+//             16#0002 E-stop  | 16#0004 lube oil pressure lost
+// The first fault that trips the pump is the one reported (not overwritten).
+// ============================================================================
+
+// 1. BEARING TEMPERATURE MONITORING
+// Alarm is evaluated independently, so it is correct even when the
+// temperature jumps straight past the alarm level into the trip level.
+#b_High_Temp_Alarm := (#r_Pump_Bearing_Temp >= #r_Temp_Alarm_SP)
+                   OR (#r_Motor_Bearing_Temp >= #r_Temp_Alarm_SP);
+
+IF (#r_Pump_Bearing_Temp >= #r_Temp_Trip_SP) OR (#r_Motor_Bearing_Temp >= #r_Temp_Trip_SP) THEN
+    IF NOT #b_Trip_Latched THEN
+        #w_Trip_Code := 16#0001; // Trip Code 1: Over-temperature
+    END_IF;
+    #b_Trip_Latched := TRUE;
+END_IF;
+
+// 2. EMERGENCY STOP MONITORING (Fail-safe: 0 = Trip)
+IF NOT #b_E_Stop_OK THEN
+    IF NOT #b_Trip_Latched THEN
+        #w_Trip_Code := 16#0002; // Trip Code 2: E-Stop Tripped
+    END_IF;
+    #b_Trip_Latched := TRUE;
+END_IF;
+
+// 3. LUBE OIL PRESSURE DELAY (5-second grace period on startup)
+#t_Oil_Lube_Timer(IN := #b_Pump_Running,
+                  PT := T#5S);
+
+IF #t_Oil_Lube_Timer.Q AND (NOT #b_Oil_Pressure_OK) THEN
+    IF NOT #b_Trip_Latched THEN
+        #w_Trip_Code := 16#0004; // Trip Code 4: Lube Oil Pressure Lost
+    END_IF;
+    #b_Trip_Latched := TRUE;
+END_IF;
+
+// 4. MANUAL FAULT RESET (only when the cause has cleared)
+IF #b_Reset_Trip THEN
+    IF (#r_Pump_Bearing_Temp < #r_Temp_Alarm_SP) AND
+       (#r_Motor_Bearing_Temp < #r_Temp_Alarm_SP) AND
+       #b_E_Stop_OK THEN
+        #b_Trip_Latched := FALSE;
+        #w_Trip_Code := 16#0000;
+    END_IF;
+END_IF;
+
+// 5. PUMP RUN / STOP LATCH
+// Start permissives: E-stop healthy, no latched trip, both bearings below
+// the alarm setpoint (cold-start check).
+IF #b_Trip_Latched OR #b_Stop_Cmd THEN
+    #b_Pump_Running := FALSE;
+ELSIF #b_Start_Cmd
+      AND #b_E_Stop_OK
+      AND (NOT #b_Trip_Latched)
+      AND (#r_Pump_Bearing_Temp < #r_Temp_Alarm_SP)
+      AND (#r_Motor_Bearing_Temp < #r_Temp_Alarm_SP) THEN
+    #b_Pump_Running := TRUE;
+END_IF;
+
+// 6. OUTPUT ASSIGNMENTS
+#b_Motor_Run_Out := #b_Pump_Running;
+#b_Tripped := #b_Trip_Latched;
